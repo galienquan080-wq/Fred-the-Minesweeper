@@ -1,85 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fred the Minesweeper</title>
-  <style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Minesweeper Prototype</title>
+
+<style>
     body {
-      background: #111;
-      color: #eee;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 20px;
+        background: #111;
+        color: #eee;
+        font-family: Arial, sans-serif;
+        display: flex;
+        gap: 20px;
+        padding: 20px;
     }
-    #board {
-      display: grid;
-      gap: 4px;
-      margin-top: 20px;
+
+    #leftPanel, #rightPanel {
+        width: 150px;
     }
+
+    #gameBoard {
+        display: grid;
+        gap: 0;
+        background: #000;
+    }
+
     .cell {
-      width: 40px;
-      height: 40px;
-      background-color: #0b4f0b;
-      border: 0.5px solid #062f06;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-      color: white;
-      font-weight: bold;
-      user-select: none;
-      transition: background-color 0.1s;
+        width: 28px;
+        height: 28px;
+        background: #0a4;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 14px;
+        cursor: pointer;
     }
+
     .cell-dug {
-      background-color:#8b5a2b;
-      border:0.5px solid #5c3c1a;
+        background: #835629;
+        cursor: default;
     }
+
     .cell-exploded {
-      background-color:#000;
+        background: #d00;
+        color: #fff;
     }
-  </style>
-  <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
-  <link rel="icon" sizes="180x180" href="favicon-180.png">
+
+    #popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #222;
+        padding: 20px;
+        border: 2px solid #555;
+        display: none;
+    }
+
+    button {
+        padding: 6px 10px;
+        margin: 4px;
+    }
+
+    button.active {
+        background: #0a4;
+        color: white;
+    }
+</style>
 </head>
+
 <body>
 
-  <!-- Language Box -->
-  <div id="langBox" style="position:fixed; left:10px; top:20px; background:#222; padding:10px 15px; border:1px solid #444; border-radius:6px;">
-    <label><input type="radio" name="lang" value="vi"> Tiếng Việt</label><br>
-    <label><input type="radio" name="lang" value="en" checked> English</label>
-  </div>
+<div id="leftPanel">
+    <h3 id="langTitle">Language</h3>
+    <button onclick="setLang('en')">English</button>
+    <button onclick="setLang('vi')">Tiếng Việt</button>
+</div>
 
-  <h1 id="title">Fred the Minesweeper</h1>
+<div>
+    <h2 id="mainTitle">Minesweeper: Stage 1</h2>
+    <div id="status">Day: 1 | Findings: none</div>
 
-  <div id="board"></div>
+    <div id="gameBoard"></div>
+</div>
 
-  <div id="tools" style="position: fixed; right: 20px; top: 100px; color:#ccc; font-size:16px; background:#222; padding:15px; border-radius:10px; border:1px solid #444;">
-    <b id="digTitle">Dig Mode:</b><br>
-    <label><input type="radio" name="digmode" value="1" checked> 1×1</label><br>
-    <label><input type="radio" name="digmode" value="3"> 3×3</label><br>
-    <label><input type="radio" name="digmode" value="5"> 5×5</label><br>
-  </div>
+<div id="rightPanel">
+    <h3 id="digModeTitle">Dig Mode</h3>
+    <button onclick="setDigMode(1)" class="active">1×1</button>
+    <button onclick="setDigMode(3)">3×3</button>
+    <button onclick="setDigMode(5)">5×5</button>
+</div>
 
-  <div id="status" style="margin-top:20px; color:#ccc; font-size:16px;">Day: 1 | Findings: none</div>
+<div id="popup">
+    <div id="popupText"></div>
+    <button onclick="closePopup()">OK</button>
+</div>
 
 <script>
   let day = 1;
   let findings = [];
   let switchCount = 0;
+  let currentLang = 'en';
+  let currentDigMode = 1;
+
   const size = Math.floor(Math.random() * 11) + 10;
   const board = [];
 
   function chooseElement() {
-    return Math.random() < 0.07 ? "switch" : (Math.random() < 0.12 ? "mine" : "empty");
+    const r = Math.random();
+
+    if (r < 0.04) return "switch";
+    else if (r < 0.10) return "mine";
+    else if (r < 0.13) return "fossil";
+    else if (r < 0.15) return "treasure";
+    return "empty";
   }
 
   function setupBoard() {
-    const boardDiv = document.getElementById("board");
-    boardDiv.style.gridTemplateColumns = `repeat(${size}, 32px)`;
-    boardDiv.style.gridTemplateRows = `repeat(${size}, 32px)`;
+    const boardDiv = document.getElementById("gameBoard");
+    boardDiv.style.gridTemplateColumns = `repeat(${size}, 30px)`;
+    boardDiv.style.gridTemplateRows = `repeat(${size}, 30px)`;
 
     let spawnedSwitch = false;
 
@@ -87,6 +128,7 @@
       board[y] = [];
       for (let x = 0; x < size; x++) {
         let element = chooseElement();
+
         if (element === "switch") {
           if (spawnedSwitch) element = "empty";
           else spawnedSwitch = true;
@@ -97,11 +139,14 @@
 
         const div = document.createElement("div");
         div.classList.add("cell");
-        div.onclick = () => reveal(cell, div);
+        div.onclick = () => reveal(cell);
+
         cell._div = div;
         boardDiv.appendChild(div);
       }
     }
+    
+    updateStatus();
   }
 
   function countMines(x, y) {
@@ -117,103 +162,135 @@
     return c;
   }
 
-  function reveal(cell, div) {
-    const mode = parseInt(document.querySelector('input[name="digmode"]:checked').value);
-    if (mode !== 1) return digArea(cell.x, cell.y, mode);
+  function addFinding(type) {
+    findings.push(type);
+    updateStatus();
+  }
+
+  function reveal(cell) {
+    if (currentDigMode !== 1) return digArea(cell.x, cell.y, currentDigMode);
 
     if (cell.revealed) return;
     cell.revealed = true;
-    div.classList.add("cell-dug");
+
+    drawCell(cell);
 
     if (cell.element === "mine") {
-      div.classList.add("cell-exploded");
-      div.textContent = "💥";
+      alert(getText("mineHit"));
+      location.reload();
+    }
+  }
+
+  function drawCell(c) {
+    const div = c._div;
+    div.classList.add("cell-dug");
+
+    switch (c.element) {
+      case "mine":
+        div.classList.add("cell-exploded");
+        div.textContent = "💥";
+        break;
+
+      case "switch":
+        div.textContent = "🔧";
+        if (confirm(getText("toggleSwitch"))) {
+          switchCount++;
+          if (switchCount === 666) alert(getText("evilEvent"));
+        }
+        break;
+
+      case "fossil":
+        div.textContent = "🦴";
+        addFinding("fossil");
+        break;
+
+      case "treasure":
+        div.textContent = "💰";
+        addFinding("treasure");
+        break;
+
+      default:
+        let m = countMines(c.x, c.y);
+        div.textContent = m === 0 ? "" : m;
+        break;
+    }
+  }
+
+  function digArea(cx, cy, mode) {
+    let r = mode === 3 ? 1 : (mode === 5 ? 2 : 0);
+
+    let triggeredMine = false;
+
+    for (let y = cy - r; y <= cy + r; y++) {
+      for (let x = cx - r; x <= cx + r; x++) {
+        if (!board[y] || !board[y][x]) continue;
+
+        const c = board[y][x];
+        if (c.revealed) continue;
+
+        c.revealed = true;
+        drawCell(c);
+
+        if (c.element === "mine") triggeredMine = true;
+      }
+    }
+
+    if (triggeredMine) {
       alert(getText("mineHit"));
       location.reload();
       return;
     }
 
-    if (cell.element === "switch") {
-      div.textContent = "🔧";
-      let g = confirm(getText("toggleSwitch"));
-      if (g) {
-        switchCount++;
-        if (switchCount === 666) alert(getText("evilEvent"));
-      }
-    } else {
-      let m = countMines(cell.x, cell.y);
-      div.textContent = m === 0 ? "" : m;
-    }
-
-    updateStatus();
-  }
-
-  function digArea(cx, cy, mode) {
-    let r = mode === 3 ? 1 : (mode === 5 ? 2 : 0);
-    for (let y = cy - r; y <= cy + r; y++) {
-      for (let x = cx - r; x <= cx + r; x++) {
-        if (board[y] && board[y][x]) {
-          const c = board[y][x];
-          if (!c.revealed) {
-            c.revealed = true;
-            c._div.classList.add("cell-dug");
-
-            if (c.element === "mine") {
-              c._div.classList.add("cell-exploded");
-              c._div.textContent = "💥";
-              alert(getText("mineHit"));
-              location.reload();
-              return;
-            }
-
-            if (c.element === "switch") {
-              c._div.textContent = "🔧";
-              let g = confirm(getText("toggleSwitch"));
-              if (g) {
-                switchCount++;
-                if (switchCount === 666) alert(getText("evilEvent"));
-              }
-            } else {
-              let m = countMines(c.x, c.y);
-              c._div.textContent = m === 0 ? "" : m;
-            }
-          }
-        }
-      }
-    }
     updateStatus();
   }
 
   function updateStatus() {
-    const L = getLang();
+    const L = currentLang;
     const txt = L === 'vi'
       ? `Ngày: ${day} | Phát hiện: ${findings.length ? findings.join(', ') : 'không có'}`
       : `Day: ${day} | Findings: ${findings.length ? findings.join(', ') : 'none'}`;
     document.getElementById("status").textContent = txt;
   }
 
-  function getLang() {
-    return document.querySelector('input[name="lang"]:checked').value;
-  }
-
-  const UItext = {
-    title: { vi: "Fred thợ đào mìn", en: "Fred the Minesweeper" },
-    digTitle: { vi: "Chế độ đào:", en: "Dig Mode:" }
-  };
-
-  function updateLanguageUI() {
-    const L = getLang();
-    document.getElementById("title").textContent = UItext.title[L];
-    document.getElementById("digTitle").textContent = UItext.digTitle[L];
+  function setLang(lang) {
+    currentLang = lang;
     updateStatus();
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    setupBoard();
-    document.querySelectorAll('input[name="lang"]').forEach(r =>
-      r.addEventListener("change", updateLanguageUI)
-    );
-  });
+  function setDigMode(mode) {
+    currentDigMode = mode;
+    
+    // Update button styles
+    document.querySelectorAll('#rightPanel button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+  }
+
+  function closePopup() {
+    document.getElementById("popup").style.display = "none";
+  }
+
+  const TEXT = {
+    mineHit: {
+      vi: "Fred đào được một quả mìn và bị nổ tung! Bắt đầu game lại.",
+      en: "Fred digs up a mine and gets blown up! Restarting game."
+    },
+    toggleSwitch: {
+      vi: "Gạt công tắc? (Coi chừng...)",
+      en: "Flip the switch? (Be careful...)"
+    },
+    evilEvent: {
+      vi: "Cánh cổng hắc ám mở ra...",
+      en: "The ancient darkness awakens..."
+    }
+  };
+
+  function getText(key) {
+    return TEXT[key][currentLang];
+  }
+
+  document.addEventListener("DOMContentLoaded", setupBoard);
 </script>
 
 </body>
